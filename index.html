@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valentine's Day - Heart of Love</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0a0008;
+            font-family: 'Cormorant Garamond', 'Georgia', serif;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 40px;
+            box-sizing: border-box;
+            transition: opacity 0.5s ease;
+        }
+
+        .ui-hidden {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* Loading */
+        #loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0008 0%, #1a0010 100%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.8s ease-out;
+        }
+
+        .loader-text {
+            color: #ff69b4;
+            font-size: 22px;
+            letter-spacing: 3px;
+            margin-top: 20px;
+            font-family: 'Great Vibes', cursive;
+            font-weight: 400;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 1px solid rgba(255, 105, 180, 0.2);
+            border-top: 1px solid #ff69b4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Typography */
+        h1 {
+            color: #ffb6c1;
+            font-size: 72px;
+            margin: 0;
+            font-weight: 400;
+            letter-spacing: 2px;
+            text-shadow: 0 0 50px rgba(255, 105, 180, 0.8), 0 0 100px rgba(255, 20, 147, 0.4);
+            background: linear-gradient(to bottom, #fff, #ff69b4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-family: 'Great Vibes', cursive;
+            opacity: 0.95;
+            transition: opacity 0.5s ease;
+        }
+
+        /* Controls */
+        .controls-wrapper {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            z-index: 20;
+            transition: opacity 0.5s ease;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .upload-btn {
+            background: rgba(20, 5, 15, 0.7);
+            border: 1px solid rgba(255, 105, 180, 0.4);
+            color: #ff69b4;
+            padding: 10px 20px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 10px;
+            transition: all 0.4s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+            min-width: 120px;
+        }
+
+        .upload-btn:hover {
+            background: #ff69b4;
+            color: #0a0008;
+            box-shadow: 0 0 20px rgba(255, 105, 180, 0.6);
+        }
+
+        .hint-text {
+            color: rgba(255, 105, 180, 0.5);
+            font-size: 9px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            text-align: right;
+            margin-top: 5px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Webcam feedback */
+        #webcam-wrapper {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 280px;
+            height: 210px;
+            border: 1px solid rgba(255, 105, 180, 0.5);
+            box-shadow: 0 0 20px rgba(255, 20, 147, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            opacity: 1;
+            pointer-events: none;
+            z-index: 50;
+            background: #0a0008;
+            transition: opacity 0.5s ease;
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        /* Debug info for gestures */
+        #debug-info {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            color: rgba(255, 105, 180, 0.8);
+            font-size: 10px;
+            font-family: monospace;
+            background: rgba(10, 0, 8, 0.7);
+            padding: 2px 5px;
+            pointer-events: none;
+        }
+    </style>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cormorant+Garamond:wght@300;400;500&display=swap');
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+                "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm"
+            }
+        }
+    </script>
+</head>
+
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <div class="loader-text">Loading Love...</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <h1>Happy Valentine's Day</h1>
+    </div>
+
+    <div id="webcam-wrapper">
+        <video id="webcam" autoplay playsinline></video>
+        <div id="debug-info">Initializing...</div>
+        <canvas id="webcam-preview" style="display:none;"></canvas>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+        import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+
+        // --- CORE CONFIG ---
+        const CONFIG = {
+            colors: {
+                bg: 0x0a0008,           // Deep romantic purple-black
+                roseGold: 0xf7a7b7,     // Soft rose gold
+                hotPink: 0xff1493,      // Vibrant hot pink
+                deepRed: 0xdc143c,      // Crimson red
+                softPink: 0xffb6c1,     // Light pink
+                white: 0xffffff,        // Pure white
+            },
+            particles: {
+                count: 1800,
+                dustCount: 2000,
+                heartScale: 1.0  // Scale of the heart formation
+            },
+            camera: { z: 50 },
+
+            preload: {
+                autoScanLocal: true,
+                scanCount: 200,
+                extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'],
+                images: [
+                    'https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=600',
+                    'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=600',
+                    'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?q=80&w=600',
+                    'https://images.unsplash.com/photo-1518568814500-bf0f8d125f46?q=80&w=600'
+                ]
+            }
+        };
+
+        const STATE = {
+            mode: 'HEART',
+            focusIndex: -1,
+            focusTarget: null,
+            hand: { detected: false, x: 0, y: 0 },
+            rotation: { x: 0, y: 0 }
+        };
+
+        let scene, camera, renderer, composer;
+        let mainGroup;
+        let clock = new THREE.Clock();
+        let particleSystem = [];
+        let photoMeshGroup = new THREE.Group();
+        let handLandmarker, video;
+        const debugInfo = document.getElementById('debug-info');
+
+        // --- Heart shape function ---
+        function getHeartPosition(t, scale = 1) {
+            // t is 0 to 2*PI
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+            return { x: x * scale * 0.8, y: y * scale * 0.8 };
+        }
+
+        async function init() {
+            initThree();
+            setupEnvironment();
+            setupLights();
+            createParticles();
+            createDust();
+            loadPredefinedImages();
+            setupPostProcessing();
+            setupEvents();
+            await initMediaPipe();
+
+            const loader = document.getElementById('loader');
+            loader.style.opacity = 0;
+            setTimeout(() => loader.remove(), 800);
+
+            animate();
+        }
+
+        // --- Multi-format image loader ---
+        function loadPredefinedImages() {
+            const loader = new THREE.TextureLoader();
+
+            // Load online images
+            CONFIG.preload.images.forEach(url => {
+                loader.load(url,
+                    (t) => { t.colorSpace = THREE.SRGBColorSpace; addPhotoToScene(t); },
+                    undefined,
+                    (e) => { console.log(`Skipped: ${url}`); }
+                );
+            });
+
+            // Load local images
+            if (CONFIG.preload.autoScanLocal) {
+                for (let i = 1; i <= CONFIG.preload.scanCount; i++) {
+                    CONFIG.preload.extensions.forEach(ext => {
+                        const path = `./images/${i}.${ext}`;
+
+                        loader.load(path,
+                            (t) => {
+                                t.colorSpace = THREE.SRGBColorSpace;
+                                addPhotoToScene(t);
+                                console.log(`Loaded: ${path}`);
+                            },
+                            undefined,
+                            (err) => { }
+                        );
+                    });
+                }
+            }
+        }
+
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(CONFIG.colors.bg);
+            scene.fog = new THREE.FogExp2(CONFIG.colors.bg, 0.008);
+
+            camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 2, CONFIG.camera.z);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ReinhardToneMapping;
+            renderer.toneMappingExposure = 2.5;
+            container.appendChild(renderer.domElement);
+
+            mainGroup = new THREE.Group();
+            scene.add(mainGroup);
+        }
+
+        function setupEnvironment() {
+            const pmremGenerator = new THREE.PMREMGenerator(renderer);
+            scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+        }
+
+        function setupLights() {
+            const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambient);
+
+            // Inner glow - pink
+            const innerLight = new THREE.PointLight(0xff69b4, 3, 30);
+            innerLight.position.set(0, 0, 5);
+            mainGroup.add(innerLight);
+
+            // Warm pink spotlight
+            const spotPink = new THREE.SpotLight(0xff69b4, 1200);
+            spotPink.position.set(30, 40, 40);
+            spotPink.angle = 0.5;
+            spotPink.penumbra = 0.5;
+            scene.add(spotPink);
+
+            // Magenta accent
+            const spotMagenta = new THREE.SpotLight(0xff00ff, 400);
+            spotMagenta.position.set(-30, 20, -30);
+            scene.add(spotMagenta);
+
+            // Red accent from below
+            const spotRed = new THREE.SpotLight(0xff1493, 600);
+            spotRed.position.set(0, -30, 20);
+            scene.add(spotRed);
+
+            // Front fill
+            const fill = new THREE.DirectionalLight(0xffb6c1, 0.6);
+            fill.position.set(0, 0, 50);
+            scene.add(fill);
+        }
+
+        function setupPostProcessing() {
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+            bloomPass.threshold = 0.5;
+            bloomPass.strength = 0.6;
+            bloomPass.radius = 0.5;
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+        }
+
+        // --- Create heart geometry ---
+        function createHeartGeometry(size = 0.3) {
+            const heartShape = new THREE.Shape();
+            const x = 0, y = 0;
+
+            heartShape.moveTo(x, y + size * 0.35);
+            heartShape.bezierCurveTo(x, y + size * 0.35, x - size * 0.05, y, x - size * 0.25, y);
+            heartShape.bezierCurveTo(x - size * 0.55, y, x - size * 0.55, y + size * 0.35, x - size * 0.55, y + size * 0.35);
+            heartShape.bezierCurveTo(x - size * 0.55, y + size * 0.55, x - size * 0.35, y + size * 0.77, x, y + size);
+            heartShape.bezierCurveTo(x + size * 0.35, y + size * 0.77, x + size * 0.55, y + size * 0.55, x + size * 0.55, y + size * 0.35);
+            heartShape.bezierCurveTo(x + size * 0.55, y + size * 0.35, x + size * 0.55, y, x + size * 0.25, y);
+            heartShape.bezierCurveTo(x + size * 0.1, y, x, y + size * 0.35, x, y + size * 0.35);
+
+            const extrudeSettings = {
+                depth: size * 0.3,
+                bevelEnabled: true,
+                bevelSegments: 2,
+                steps: 1,
+                bevelSize: size * 0.05,
+                bevelThickness: size * 0.05
+            };
+
+            const geometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
+            geometry.center();
+            return geometry;
+        }
+
+        class Particle {
+            constructor(mesh, type, isDust = false) {
+                this.mesh = mesh;
+                this.type = type;
+                this.isDust = isDust;
+
+                this.posHeart = new THREE.Vector3();
+                this.posScatter = new THREE.Vector3();
+                this.baseScale = mesh.scale.x;
+
+                const speedMult = (type === 'PHOTO') ? 0.3 : 2.0;
+
+                this.spinSpeed = new THREE.Vector3(
+                    (Math.random() - 0.5) * speedMult,
+                    (Math.random() - 0.5) * speedMult,
+                    (Math.random() - 0.5) * speedMult
+                );
+
+                this.floatOffset = Math.random() * Math.PI * 2;
+                this.floatSpeed = 0.5 + Math.random() * 0.5;
+
+                this.calculatePositions();
+            }
+
+            calculatePositions() {
+                if (this.type === 'PHOTO') {
+                    this.posHeart.set(0, 0, 0);
+                    const rScatter = 8 + Math.random() * 12;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    this.posScatter.set(
+                        rScatter * Math.sin(phi) * Math.cos(theta),
+                        rScatter * Math.sin(phi) * Math.sin(theta),
+                        rScatter * Math.cos(phi)
+                    );
+                    return;
+                }
+
+                // HEART formation - 3D heart shape
+                const t = Math.random() * Math.PI * 2;
+                const heartPos = getHeartPosition(t, CONFIG.particles.heartScale);
+
+                // Add depth variation for 3D effect
+                const depthVariation = (Math.random() - 0.5) * 4;
+                const surfaceOffset = (Math.random() - 0.5) * 1.5;
+
+                this.posHeart.set(
+                    heartPos.x + surfaceOffset,
+                    heartPos.y + surfaceOffset,
+                    depthVariation
+                );
+
+                // SCATTER: 3D Sphere
+                let rScatter = this.isDust ? (12 + Math.random() * 20) : (8 + Math.random() * 12);
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                this.posScatter.set(
+                    rScatter * Math.sin(phi) * Math.cos(theta),
+                    rScatter * Math.sin(phi) * Math.sin(theta),
+                    rScatter * Math.cos(phi)
+                );
+            }
+
+            update(dt, mode, focusTargetMesh) {
+                let target = this.posHeart;
+
+                if (mode === 'SCATTER') target = this.posScatter;
+                else if (mode === 'FOCUS') {
+                    if (this.mesh === focusTargetMesh) {
+                        const desiredWorldPos = new THREE.Vector3(0, 2, 35);
+                        const invMatrix = new THREE.Matrix4().copy(mainGroup.matrixWorld).invert();
+                        target = desiredWorldPos.applyMatrix4(invMatrix);
+                    } else {
+                        target = this.posScatter;
+                    }
+                }
+
+                const lerpSpeed = (mode === 'FOCUS' && this.mesh === focusTargetMesh) ? 5.0 : 2.0;
+                this.mesh.position.lerp(target, lerpSpeed * dt);
+
+                // Add gentle floating motion in HEART mode
+                if (mode === 'HEART' && !this.isDust) {
+                    const floatY = Math.sin(clock.elapsedTime * this.floatSpeed + this.floatOffset) * 0.1;
+                    this.mesh.position.y += floatY * dt;
+                }
+
+                if (mode === 'SCATTER') {
+                    this.mesh.rotation.x += this.spinSpeed.x * dt;
+                    this.mesh.rotation.y += this.spinSpeed.y * dt;
+                    this.mesh.rotation.z += this.spinSpeed.z * dt;
+                } else if (mode === 'HEART') {
+                    if (this.type === 'PHOTO') {
+                        this.mesh.lookAt(0, this.mesh.position.y, 0);
+                        this.mesh.rotateY(Math.PI);
+                    } else {
+                        this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, 0, dt);
+                        this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, 0, dt);
+                        this.mesh.rotation.y += 0.5 * dt;
+                    }
+                }
+
+                if (mode === 'FOCUS' && this.mesh === focusTargetMesh) {
+                    this.mesh.lookAt(camera.position);
+                }
+
+                let s = this.baseScale;
+                if (this.isDust) {
+                    s = this.baseScale * (0.8 + 0.4 * Math.sin(clock.elapsedTime * 4 + this.mesh.id));
+                    if (mode === 'HEART') s = 0;
+                } else if (mode === 'SCATTER' && this.type === 'PHOTO') {
+                    s = this.baseScale * 2.5;
+                } else if (mode === 'FOCUS') {
+                    if (this.mesh === focusTargetMesh) s = 4.5;
+                    else s = this.baseScale * 0.8;
+                }
+
+                this.mesh.scale.lerp(new THREE.Vector3(s, s, s), 4 * dt);
+            }
+        }
+
+        function updatePhotoLayout() {
+            const photos = particleSystem.filter(p => p.type === 'PHOTO');
+            const count = photos.length;
+            if (count === 0) return;
+
+            // Distribute photos along heart outline
+            photos.forEach((p, i) => {
+                const t = (i / count) * Math.PI * 2;
+                const heartPos = getHeartPosition(t, CONFIG.particles.heartScale);
+                const r = 3; // Offset from surface
+
+                p.posHeart.set(
+                    heartPos.x * 1.3,
+                    heartPos.y * 1.3,
+                    5 // In front of heart
+                );
+            });
+        }
+
+        function createParticles() {
+            const heartGeo = createHeartGeometry(0.4);
+            const sphereGeo = new THREE.SphereGeometry(0.3, 16, 16);
+            const smallHeartGeo = createHeartGeometry(0.25);
+
+            // Rose gold material
+            const roseGoldMat = new THREE.MeshStandardMaterial({
+                color: CONFIG.colors.roseGold,
+                metalness: 0.9, roughness: 0.15,
+                envMapIntensity: 2.0,
+                emissive: 0x331111,
+                emissiveIntensity: 0.3
+            });
+
+            // Hot pink material
+            const hotPinkMat = new THREE.MeshStandardMaterial({
+                color: CONFIG.colors.hotPink,
+                metalness: 0.3, roughness: 0.4,
+                emissive: 0x330011,
+                emissiveIntensity: 0.4
+            });
+
+            // Deep red crystal material
+            const deepRedMat = new THREE.MeshPhysicalMaterial({
+                color: CONFIG.colors.deepRed,
+                metalness: 0.4, roughness: 0.1, clearcoat: 1.0,
+                emissive: 0x220000,
+                emissiveIntensity: 0.3
+            });
+
+            // Soft pink glow material
+            const softPinkMat = new THREE.MeshStandardMaterial({
+                color: CONFIG.colors.softPink,
+                metalness: 0.2, roughness: 0.6,
+                emissive: 0x221111,
+                emissiveIntensity: 0.5
+            });
+
+            // White sparkle material
+            const whiteMat = new THREE.MeshStandardMaterial({
+                color: CONFIG.colors.white,
+                metalness: 0.8, roughness: 0.1,
+                emissive: 0xffffff,
+                emissiveIntensity: 0.3
+            });
+
+            for (let i = 0; i < CONFIG.particles.count; i++) {
+                const rand = Math.random();
+                let mesh, type;
+
+                if (rand < 0.35) {
+                    // Rose gold hearts
+                    mesh = new THREE.Mesh(heartGeo, roseGoldMat);
+                    type = 'ROSE_HEART';
+                } else if (rand < 0.55) {
+                    // Hot pink hearts
+                    mesh = new THREE.Mesh(smallHeartGeo, hotPinkMat);
+                    type = 'PINK_HEART';
+                } else if (rand < 0.75) {
+                    // Deep red hearts
+                    mesh = new THREE.Mesh(heartGeo, deepRedMat);
+                    type = 'RED_HEART';
+                } else if (rand < 0.90) {
+                    // Soft pink orbs
+                    mesh = new THREE.Mesh(sphereGeo, softPinkMat);
+                    type = 'PINK_ORB';
+                } else {
+                    // White sparkles
+                    mesh = new THREE.Mesh(sphereGeo, whiteMat);
+                    type = 'SPARKLE';
+                }
+
+                const s = 0.3 + Math.random() * 0.4;
+                mesh.scale.set(s, s, s);
+                mesh.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+
+                mainGroup.add(mesh);
+                particleSystem.push(new Particle(mesh, type, false));
+            }
+
+            // Beautiful center heart with multiple layers
+            // Inner glowing core
+            const innerHeartGeo = new THREE.SphereGeometry(1.8, 32, 32);
+            const innerHeartMat = new THREE.MeshStandardMaterial({
+                color: 0xff1493,
+                emissive: 0xff69b4,
+                emissiveIntensity: 1.5,
+                transparent: true,
+                opacity: 0.9
+            });
+            const innerHeart = new THREE.Mesh(innerHeartGeo, innerHeartMat);
+            innerHeart.position.set(0, 0, 0);
+            mainGroup.add(innerHeart);
+
+            // Outer glass heart shell
+            const outerHeartGeo = new THREE.SphereGeometry(2.5, 32, 32);
+            const outerHeartMat = new THREE.MeshPhysicalMaterial({
+                color: 0xffb6c1,
+                metalness: 0.1,
+                roughness: 0.05,
+                transmission: 0.9,
+                thickness: 0.5,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.1,
+                envMapIntensity: 1.0,
+                transparent: true,
+                opacity: 0.4
+            });
+            const outerHeart = new THREE.Mesh(outerHeartGeo, outerHeartMat);
+            outerHeart.position.set(0, 0, 0);
+            mainGroup.add(outerHeart);
+
+            // Store reference for pulsing animation
+            window.centerHeartInner = innerHeart;
+            window.centerHeartOuter = outerHeart;
+
+            mainGroup.add(photoMeshGroup);
+        }
+
+        function createDust() {
+            const geo = new THREE.TetrahedronGeometry(0.06, 0);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffb6c1, transparent: true, opacity: 0.8 });
+
+            for (let i = 0; i < CONFIG.particles.dustCount; i++) {
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.scale.setScalar(0.5 + Math.random());
+                mainGroup.add(mesh);
+                particleSystem.push(new Particle(mesh, 'DUST', true));
+            }
+        }
+
+        function addPhotoToScene(texture) {
+            const frameGeo = new THREE.BoxGeometry(1.4, 1.4, 0.05);
+            const frameMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.roseGold, metalness: 1.0, roughness: 0.1 });
+            const frame = new THREE.Mesh(frameGeo, frameMat);
+
+            let width = 1.2;
+            let height = 1.2;
+
+            if (texture.image) {
+                const aspect = texture.image.width / texture.image.height;
+                if (aspect > 1) {
+                    height = width / aspect;
+                } else {
+                    width = height * aspect;
+                }
+            }
+
+            const photoGeo = new THREE.PlaneGeometry(width, height);
+            const photoMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+            const photo = new THREE.Mesh(photoGeo, photoMat);
+            photo.position.z = 0.04;
+
+            const group = new THREE.Group();
+            group.add(frame);
+            group.add(photo);
+
+            frame.scale.set(width / 1.2, height / 1.2, 1);
+
+            const s = 0.8;
+            group.scale.set(s, s, s);
+
+            photoMeshGroup.add(group);
+            particleSystem.push(new Particle(group, 'PHOTO', false));
+
+            updatePhotoLayout();
+        }
+
+        function handleImageUpload(e) {
+            const files = e.target.files;
+            if (!files.length) return;
+
+            Array.from(files).forEach(f => {
+                if (!f.type.startsWith('image/')) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    new THREE.TextureLoader().load(ev.target.result, (t) => {
+                        t.colorSpace = THREE.SRGBColorSpace;
+                        addPhotoToScene(t);
+                    });
+                }
+                reader.readAsDataURL(f);
+            });
+        }
+
+        // --- MEDIAPIPE ---
+        async function initMediaPipe() {
+            video = document.getElementById('webcam');
+
+            const constraints = {
+                video: {
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    frameRate: { ideal: 30 }
+                }
+            };
+
+            const vision = await FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+            );
+            handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                    delegate: "GPU"
+                },
+                runningMode: "VIDEO",
+                numHands: 1
+            });
+
+            if (navigator.mediaDevices?.getUserMedia) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    video.srcObject = stream;
+                    video.addEventListener("loadeddata", predictWebcam);
+                    debugInfo.innerText = "Webcam active. Show hand.";
+                } catch (e) {
+                    console.warn("Webcam access denied or not available", e);
+                    debugInfo.innerText = "Camera error: " + e.message;
+                    document.getElementById('webcam-wrapper').style.display = 'none';
+                }
+            }
+        }
+
+        let lastVideoTime = -1;
+        async function predictWebcam() {
+            if (video.currentTime !== lastVideoTime) {
+                lastVideoTime = video.currentTime;
+                if (handLandmarker) {
+                    const result = handLandmarker.detectForVideo(video, performance.now());
+                    processGestures(result);
+                }
+            }
+            requestAnimationFrame(predictWebcam);
+        }
+
+        function processGestures(result) {
+            if (result.landmarks && result.landmarks.length > 0) {
+                STATE.hand.detected = true;
+                const lm = result.landmarks[0];
+                STATE.hand.x = (lm[9].x - 0.5) * 2;
+                STATE.hand.y = (lm[9].y - 0.5) * 2;
+
+                const thumb = lm[4];
+                const index = lm[8];
+                const wrist = lm[0];
+                const middleMCP = lm[9];
+
+                const handSize = Math.hypot(middleMCP.x - wrist.x, middleMCP.y - wrist.y);
+                if (handSize < 0.02) return;
+
+                const tips = [lm[8], lm[12], lm[16], lm[20]];
+                let avgTipDist = 0;
+                tips.forEach(t => avgTipDist += Math.hypot(t.x - wrist.x, t.y - wrist.y));
+                avgTipDist /= 4;
+
+                const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+
+                const extensionRatio = avgTipDist / handSize;
+                const pinchRatio = pinchDist / handSize;
+
+                debugInfo.innerText = `Size: ${handSize.toFixed(2)} | Ext: ${extensionRatio.toFixed(2)} | Pinch: ${pinchRatio.toFixed(2)} | Mode: ${STATE.mode}`;
+
+                // State transition logic
+                if (extensionRatio < 1.5) {
+                    // Closed fist -> Heart formation
+                    STATE.mode = 'HEART';
+                    STATE.focusTarget = null;
+                } else if (pinchRatio < 0.35) {
+                    // Pinch -> View photo
+                    if (STATE.mode !== 'FOCUS') {
+                        STATE.mode = 'FOCUS';
+                        const photos = particleSystem.filter(p => p.type === 'PHOTO');
+                        if (photos.length) STATE.focusTarget = photos[Math.floor(Math.random() * photos.length)].mesh;
+                    }
+                } else if (extensionRatio > 1.7) {
+                    // Open hand -> Scatter
+                    STATE.mode = 'SCATTER';
+                    STATE.focusTarget = null;
+                }
+            } else {
+                STATE.hand.detected = false;
+                debugInfo.innerText = "No hand detected";
+            }
+        }
+
+        function setupEvents() {
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                composer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            window.addEventListener('keydown', (e) => {
+                if (e.key.toLowerCase() === 'h') {
+                    const webcam = document.getElementById('webcam-wrapper');
+                    if (webcam) webcam.classList.toggle('ui-hidden');
+                }
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+
+            // Rotation based on hand tracking
+            if (STATE.mode === 'SCATTER' && STATE.hand.detected) {
+                const targetRotY = STATE.hand.x * Math.PI * 0.9;
+                const targetRotX = STATE.hand.y * Math.PI * 0.25;
+                STATE.rotation.y += (targetRotY - STATE.rotation.y) * 3.0 * dt;
+                STATE.rotation.x += (targetRotX - STATE.rotation.x) * 3.0 * dt;
+            } else {
+                if (STATE.mode === 'HEART') {
+                    STATE.rotation.y += 0.2 * dt; // Slower, romantic rotation
+                    STATE.rotation.x += (0 - STATE.rotation.x) * 2.0 * dt;
+                } else {
+                    STATE.rotation.y += 0.1 * dt;
+                }
+            }
+
+            mainGroup.rotation.y = STATE.rotation.y;
+            mainGroup.rotation.x = STATE.rotation.x;
+
+            particleSystem.forEach(p => p.update(dt, STATE.mode, STATE.focusTarget));
+
+            // Center heart pulsing animation
+            if (window.centerHeartInner && window.centerHeartOuter) {
+                const pulse = 1 + 0.08 * Math.sin(clock.elapsedTime * 2);
+                const outerPulse = 1 + 0.05 * Math.sin(clock.elapsedTime * 2 + 0.5);
+                window.centerHeartInner.scale.setScalar(pulse);
+                window.centerHeartOuter.scale.setScalar(outerPulse);
+
+                // Gentle color pulse
+                const intensity = 1.2 + 0.5 * Math.sin(clock.elapsedTime * 1.5);
+                window.centerHeartInner.material.emissiveIntensity = intensity;
+            }
+
+            composer.render();
+        }
+
+        init();
+    </script>
+</body>
+
+</html>
